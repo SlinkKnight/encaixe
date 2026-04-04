@@ -36,7 +36,7 @@ export default function Auth() {
   return (
     <div className={s.wrap}>
       <div className={s.box}>
-        <h1 className={s.title}>// GRANA</h1>
+        <h1 className={s.title}>// ENCAIXE</h1>
         <p className={s.sub}>sistema pessoal de finanças</p>
 
         <input

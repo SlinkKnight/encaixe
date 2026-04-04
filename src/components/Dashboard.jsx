@@ -160,8 +160,7 @@ export default function Dashboard({ user }) {
               style={{ flex: '0 0 120px' }}
               placeholder="valor"
               type="number"
-              inputMode="decimal"
-              step="0.01"
+              inputMode="numeric"
               value={amount}
               onChange={e => setAmount(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && document.getElementById('desc-input').focus()}
