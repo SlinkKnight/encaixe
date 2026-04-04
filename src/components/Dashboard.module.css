@@ -168,3 +168,49 @@ input[type='date'] { color-scheme: dark; }
 .modalSub   { font-size: 13px; color: var(--fg3); }
 .modalBtns  { display: flex; gap: 6px; }
 .modalBtns .btn { flex: 1; }
+
+/* debt box accent */
+.debtBox { border-color: var(--bg2); }
+.debtBox.focused { border-color: var(--purple, #b16286); }
+.debtColor { color: var(--purple2, #d3869b); }
+.typeTag {
+  font-size: 9px; letter-spacing: 1px; color: var(--purple2, #d3869b);
+  background: rgba(177,98,134,0.12); padding: 1px 5px; border-radius: 2px; margin-left: 6px;
+  vertical-align: middle;
+}
+.balSub { font-size: 10px; color: var(--fg4); margin-top: 1px; }
+.overdueTag {
+  font-size: 10px; color: var(--red2); letter-spacing: 1px; margin-bottom: 2px;
+}
+.debtItem  { border-left-color: var(--purple, #b16286); padding: 8px 12px; display: flex; align-items: flex-start; gap: 8px; transition: background 0.08s; }
+.debtItem + .debtItem { border-top: 1px solid var(--bg2); }
+.debtItem:hover { background: var(--bg2); }
+.debtSettled { opacity: 0.45; }
+.debtSettled .txDesc { text-decoration: line-through; }
+.debtOverdue { border-left-color: var(--red2); }
+
+.checkbox {
+  flex-shrink: 0; width: 15px; height: 15px; margin-top: 2px;
+  border: 1px solid var(--bg3); border-radius: 2px; background: var(--bg);
+  color: var(--bg); font-size: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+.checkbox:hover { border-color: var(--green2); }
+.checked { background: var(--green); border-color: var(--green); }
+
+.divider {
+  font-size: 10px; color: var(--bg3); letter-spacing: 2px;
+  padding: 5px 12px; border-top: 1px solid var(--bg2); background: var(--bg1);
+}
+
+/* type toggle in modal */
+.typeToggle { display: flex; gap: 5px; }
+.typeBtn {
+  flex: 1; background: var(--bg2); border: 1px solid var(--bg2);
+  color: var(--fg4); font-family: inherit; font-size: 12px; letter-spacing: 1px;
+  padding: 8px; border-radius: 2px; cursor: pointer; transition: all 0.1s;
+}
+.typeBtn:hover { color: var(--fg); }
+.typeBtnActive { border-color: var(--yellow); color: var(--yellow2); background: var(--bg3); }
+.typeBtnActiveDebt { border-color: var(--purple, #b16286); color: var(--purple2, #d3869b); background: var(--bg3); }
