@@ -157,12 +157,14 @@ export default function Dashboard({ user }) {
           <div className={s.entryRow}>
             <input
               className={s.input}
-              style={{ flex: '0 0 120px' }}
+              style={{ flex: '0 0 120px', MozAppearance: 'textfield' }}
               placeholder="valor"
               type="number"
-              inputMode="numeric"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
               value={amount}
-              onChange={e => setAmount(e.target.value)}
+              onChange={e => setAmount(e.target.value < 0 ? '' : e.target.value)}
               onKeyDown={e => e.key === 'Enter' && document.getElementById('desc-input').focus()}
             />
             <input
