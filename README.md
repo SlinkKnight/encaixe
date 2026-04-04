@@ -1,6 +1,6 @@
-# grana 💰
+# encaixe
 
-Sistema pessoal de finanças minimalista. Organize seu dinheiro em **caixas** independentes — uma para cada contexto da sua vida.
+Sistema pessoal de finanças minimalista. Organize seu dinheiro em **caixas** independentes.
 
 ![stack](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react)
 ![stack](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite)
@@ -17,7 +17,6 @@ Sistema pessoal de finanças minimalista. Organize seu dinheiro em **caixas** in
 - **autenticação** — usuário e senha, sem confirmação de e-mail
 - **dados online** — PostgreSQL via Supabase, Row Level Security por usuário
 - **mobile-first** — funciona bem em qualquer tela
-- **tema gruvbox** — fonte JetBrains Mono
 
 ---
 
