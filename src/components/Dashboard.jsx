@@ -157,7 +157,7 @@ export default function Dashboard({ user }) {
           <div className={s.entryRow}>
             <input
               className={s.input}
-              style={{ flex: '0 0 120px', MozAppearance: 'textfield' }}
+              style={{ flex: '0 0 120px', MozAppearance: 'textfield', WebkitAppearance: 'none', appearance: 'textfield' }}
               placeholder="valor"
               type="number"
               inputMode="decimal"
