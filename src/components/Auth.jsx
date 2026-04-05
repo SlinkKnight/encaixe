@@ -40,7 +40,7 @@ export default function Auth() {
         <p className={s.sub}>sistema pessoal de finanças</p>
 
         <input
-          className={s.input}
+          className={s.input} style={{ fontSize: "16px" }}
           placeholder="usuário"
           value={username}
           onChange={e => setUsername(e.target.value)}
@@ -50,7 +50,7 @@ export default function Auth() {
         />
         <input
           id="pass"
-          className={s.input}
+          className={s.input} style={{ fontSize: "16px" }}
           type="password"
           placeholder="senha"
           value={password}

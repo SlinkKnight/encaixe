@@ -3,7 +3,6 @@
 .dot   { color: var(--fg4); text-align: center; padding: 48px; font-size: 24px; }
 .empty { color: var(--fg4); font-size: 12px; text-align: center; padding: 20px; letter-spacing: 1px; }
 
-/* header */
 .header {
   position: sticky; top: 0; z-index: 10; background: var(--bg);
   display: flex; align-items: center; gap: 8px;
@@ -15,15 +14,12 @@
 .logoutBtn   { background: none; border: none; color: var(--fg4); font-size: 11px; font-family: inherit; cursor: pointer; padding: 4px; white-space: nowrap; letter-spacing: 1px; }
 .logoutBtn:hover { color: var(--red2); }
 
-/* box list */
 .boxList { display: flex; flex-direction: column; gap: 12px; }
 
-/* box card */
 .boxCard         { border: 1px solid var(--bg2); border-radius: 3px; overflow: hidden; transition: border-color 0.12s; }
 .focused         { border-color: var(--yellow); }
 .debtBox.focused { border-color: #b16286; }
 
-/* balance */
 .balCard   { background: var(--bg1); padding: 12px 14px; display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--bg2); }
 .balLabel  { font-size: 10px; color: var(--fg4); letter-spacing: 2px; margin-bottom: 2px; }
 .balAmount { font-size: 24px; font-weight: 700; letter-spacing: -1px; }
@@ -36,20 +32,13 @@
 .outColor     { color: var(--orange2); }
 .pendingColor { color: #d3869b; }
 .overdueTag   { font-size: 10px; color: var(--red2); letter-spacing: 1px; margin-bottom: 2px; }
+.typeTag      { font-size: 9px; letter-spacing: 1px; color: #d3869b; background: rgba(177,98,134,0.15); padding: 1px 5px; border-radius: 2px; margin-left: 6px; vertical-align: middle; }
 
-.typeTag {
-  font-size: 9px; letter-spacing: 1px; color: #d3869b;
-  background: rgba(177,98,134,0.15); padding: 1px 5px; border-radius: 2px;
-  margin-left: 6px; vertical-align: middle;
-}
-
-/* entry form */
-.entryForm  { background: var(--bg1); padding: 8px 10px; border-bottom: 1px solid var(--bg2); }
-.entryRow   { display: flex; gap: 5px; margin-bottom: 5px; }
-.entryBtns  { display: flex; gap: 5px; }
+.entryForm { background: var(--bg1); padding: 8px 10px; border-bottom: 1px solid var(--bg2); }
+.entryRow  { display: flex; gap: 5px; margin-bottom: 5px; }
+.entryBtns { display: flex; gap: 5px; }
 .entryBtns .btn { flex: 1; }
 
-/* inputs */
 .input {
   background: var(--bg); border: 1px solid var(--bg2); color: var(--fg);
   padding: 9px 10px; border-radius: 2px; width: 100%; outline: none;
@@ -58,88 +47,84 @@
 .input:focus     { border-color: var(--yellow); }
 input[type=date] { color-scheme: dark; }
 
-/* buttons */
-.btn { background: var(--bg2); border: 1px solid var(--bg2); color: var(--fg2); padding: 9px 12px; border-radius: 2px; font-family: inherit; font-size: 13px; cursor: pointer; letter-spacing: 0.5px; transition: background 0.1s, color 0.1s; white-space: nowrap; touch-action: manipulation; }
-.btn:hover:not(:disabled)         { background: var(--bg3); color: var(--fg); }
+.btn { background: var(--bg2); border: 1px solid var(--bg2); color: var(--fg2); padding: 9px 12px; border-radius: 2px; font-family: inherit; font-size: 13px; cursor: pointer; letter-spacing: 0.5px; transition: background 0.1s, color 0.1s; white-space: nowrap; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.btn:active                       { opacity: 0.75; }
 .btn:disabled                     { opacity: 0.35; cursor: not-allowed; }
 .primary                          { background: var(--yellow); color: var(--bg); border-color: var(--yellow); font-weight: 700; font-size: 12px; }
-.primary:hover:not(:disabled)     { background: var(--yellow2); }
+.primary:active                   { background: var(--yellow2); }
 .danger                           { border-color: transparent; color: var(--fg4); }
-.danger:hover:not(:disabled)      { background: var(--red); color: var(--fg); }
+.danger:active                    { background: var(--red); color: var(--fg); }
 .green                            { border-color: transparent; color: var(--fg4); }
-.green:hover:not(:disabled)       { background: var(--green); color: var(--bg); }
+.green:active                     { background: var(--green); color: var(--bg); }
 .small                            { padding: 5px 9px; font-size: 11px; width: auto; }
 .full                             { width: 100%; }
 .addBoxBtn                        { color: var(--aqua2); border-color: transparent; }
-.addBoxBtn:hover                  { background: var(--aqua); color: var(--bg); }
+.addBoxBtn:active                 { background: var(--aqua); color: var(--bg); }
 
-/* tx list */
 .txList    { display: flex; flex-direction: column; background: var(--bg1); }
-.txLoading { color: var(--fg4); text-align: center; padding: 10px; font-size: 18px; }
+.txLoading { color: var(--fg4); text-align: center; padding: 12px; font-size: 18px; }
 
 .txItem {
-  padding: 10px 12px; display: flex; align-items: center; gap: 10px;
-  border-left: 2px solid transparent; transition: background 0.08s;
-  touch-action: manipulation;
+  padding: 10px 8px 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  border-left: 2px solid transparent;
+  -webkit-tap-highlight-color: transparent;
 }
 .txItem + .txItem { border-top: 1px solid var(--bg2); }
-.txItem:hover     { background: var(--bg2); }
 .txIn      { border-left-color: var(--green); }
 .txOut     { border-left-color: var(--orange); }
 .txPending { border-left-color: #b16286; }
 .txOverdue { border-left-color: var(--red2); }
 
-.txLeft         { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.txDesc         { font-size: 13px; color: var(--fg); word-break: break-word; }
-.txMeta         { font-size: 10px; color: var(--fg4); }
-.txAmt          { font-size: 13px; font-weight: 700; white-space: nowrap; }
-.strikethrough .txDesc { text-decoration: line-through; opacity: 0.5; }
+.txLeft  { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.txDesc  { font-size: 13px; color: var(--fg); word-break: break-word; }
+.txMeta  { font-size: 10px; color: var(--fg4); }
+.txAmt   { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.settled .txDesc { text-decoration: line-through; opacity: 0.45; }
 
-/* delete button — large touch target */
+/* delete — 44px tap target, visually smaller */
 .delBtn {
   background: none; border: none; color: var(--bg3);
-  font-family: inherit; font-size: 18px; line-height: 1;
-  cursor: pointer; padding: 6px 8px; flex-shrink: 0;
-  transition: color 0.1s; touch-action: manipulation;
-  min-width: 36px; min-height: 36px;
+  font-family: inherit; font-size: 20px; line-height: 1;
+  cursor: pointer; flex-shrink: 0;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
+  transition: color 0.1s;
 }
-.delBtn:hover { color: var(--red2); }
+.delBtn:active { color: var(--red2); }
 
-/* checkbox — large touch target */
+/* checkbox — 44px tap target */
 .checkbox {
-  flex-shrink: 0; width: 22px; height: 22px;
+  flex-shrink: 0;
   border: 1px solid var(--bg3); border-radius: 3px; background: var(--bg);
-  color: var(--bg); font-size: 12px; cursor: pointer;
+  color: transparent; font-size: 12px; cursor: pointer;
   display: flex; align-items: center; justify-content: center; padding: 0;
   transition: background 0.1s, border-color 0.1s;
-  touch-action: manipulation; min-width: 36px; min-height: 36px;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  width: 44px; height: 44px;
 }
-.checkbox:hover { border-color: var(--green2); }
-.checked        { background: var(--green); border-color: var(--green); }
+.checkbox:active { border-color: var(--green2); }
+.checked { background: var(--green); border-color: var(--green); color: var(--bg); }
 
-.expandBtn { background: none; border: none; border-top: 1px solid var(--bg2); color: var(--fg4); font-family: inherit; font-size: 11px; letter-spacing: 1px; padding: 8px 12px; cursor: pointer; width: 100%; text-align: left; transition: background 0.1s, color 0.1s; touch-action: manipulation; }
-.expandBtn:hover { background: var(--bg2); color: var(--yellow2); }
+.expandBtn { background: none; border: none; border-top: 1px solid var(--bg2); color: var(--fg4); font-family: inherit; font-size: 11px; letter-spacing: 1px; padding: 10px 12px; cursor: pointer; width: 100%; text-align: left; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.expandBtn:active { background: var(--bg2); }
 
 .divider { font-size: 10px; color: var(--bg3); letter-spacing: 2px; padding: 5px 12px; border-top: 1px solid var(--bg2); background: var(--bg1); }
 
-/* box footer */
 .boxFooter { background: var(--bg1); padding: 7px 10px; border-top: 1px solid var(--bg2); }
 
-/* misc */
 .err { font-size: 11px; color: var(--red2); margin-top: 5px; }
 
-/* modals */
-.modalBg { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modalBg { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
 .modal   { background: var(--bg1); border: 1px solid var(--bg3); border-radius: 3px; padding: 18px; width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 10px; }
 .modalTitle { font-size: 12px; color: var(--fg3); letter-spacing: 2px; }
 .modalSub   { font-size: 13px; color: var(--fg3); }
 .modalBtns  { display: flex; gap: 6px; }
 .modalBtns .btn { flex: 1; }
 
-/* type toggle */
 .typeToggle { display: flex; gap: 5px; }
-.typeBtn    { flex: 1; background: var(--bg2); border: 1px solid var(--bg2); color: var(--fg4); font-family: inherit; font-size: 12px; letter-spacing: 1px; padding: 8px; border-radius: 2px; cursor: pointer; transition: all 0.1s; touch-action: manipulation; }
-.typeBtn:hover     { color: var(--fg); }
-.typeBtnActive     { border-color: var(--yellow); color: var(--yellow2); background: var(--bg3); }
-.typeBtnDebt       { border-color: #b16286; color: #d3869b; background: var(--bg3); }
+.typeBtn    { flex: 1; background: var(--bg2); border: 1px solid var(--bg2); color: var(--fg4); font-family: inherit; font-size: 12px; letter-spacing: 1px; padding: 10px 8px; border-radius: 2px; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.typeBtn:active  { opacity: 0.7; }
+.typeBtnActive   { border-color: var(--yellow); color: var(--yellow2); background: var(--bg3); }
+.typeBtnDebt     { border-color: #b16286; color: #d3869b; background: var(--bg3); }
