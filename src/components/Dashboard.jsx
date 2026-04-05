@@ -54,28 +54,12 @@ const TxRow = memo(({ t, onToggle, onDel }) => {
   )
 })
 
-// ── AmountInput ───────────────────────────────────────────────────────────────
-const AmountInput = ({ value, onChange, onEnter, inputRef, onFocus }) => (
-  <input
-    ref={inputRef}
-    className={s.input}
-    style={{ fontSize: '16px', flex: '0 0 110px' }}
-    placeholder="valor"
-    type="text"
-    inputMode="decimal"
-    value={value}
-    onChange={e => onChange(e.target.value.replace(/[^0-9,.]/g, ''))}
-    onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), onEnter?.())}
-    onFocus={onFocus}
-  />
-)
-
 // ── BoxCard ───────────────────────────────────────────────────────────────────
 function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const [txs, setTxs]           = useState([])
   const [loading, setLoading]   = useState(true)
   const [expanded, setExpanded] = useState(false)
-  const [debtOpen, setDebtOpen] = useState(false)  // extra debt fields visible
+  const [debtOpen, setDebtOpen] = useState(false)
   const [amount, setAmount]     = useState('')
   const [desc,   setDesc]       = useState('')
   const [debtor, setDebtor]     = useState('')
@@ -84,65 +68,93 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const amountRef = useRef(null)
   const descRef   = useRef(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    const { data } = await supabase
+  // load once on mount — no deps that change
+  useEffect(() => {
+    let cancelled = false
+    supabase
       .from('transactions')
       .select('id,amount,description,pending,settled,debtor,due_date,created_at')
       .eq('box_id', box.id)
       .order('pending', { ascending: true })
       .order('created_at', { ascending: false })
-      .limit(150)
-    setTxs(data ?? [])
-    setLoading(false)
+      .limit(200)
+      .then(({ data }) => { if (!cancelled) { setTxs(data ?? []); setLoading(false) } })
+    return () => { cancelled = true }
   }, [box.id])
 
-  useEffect(() => { load() }, [load])
   useEffect(() => { if (focused) amountRef.current?.focus() }, [focused])
 
+  const resetForm = () => {
+    setAmount(''); setDesc(''); setDebtor(''); setDue(''); setErr('')
+    amountRef.current?.focus()
+  }
+
   const addTx = useCallback(async (sign) => {
+    // sign=1 entrada, sign=-1 saída, sign=0 dívida
+    // if entrada/saída clicked while debtOpen → just close debt panel, reset, don't error
+    if (sign !== 0 && debtOpen) {
+      setDebtOpen(false); resetForm(); return
+    }
     setErr('')
     const v = parseAmt(amount)
-    if (!amount || isNaN(v) || v <= 0) { setErr('valor inválido'); return }
-    const row = sign === 0
-      ? { box_id: box.id, user_id: uid, amount: v,
-          description: desc.trim() || null,
-          debtor: debtor.trim() || null,
-          due_date: due || null,
-          pending: true, settled: false }
-      : { box_id: box.id, user_id: uid, amount: sign * v,
-          description: desc.trim() || null,
-          pending: false, settled: false }
-    const { error } = await supabase.from('transactions').insert(row)
-    if (!error) {
-      setAmount(''); setDesc(''); setDebtor(''); setDue('')
-      if (sign !== 0) setDebtOpen(false)
-      load()
+    if (!amount || isNaN(v) || v <= 0) {
+      setErr('valor inválido')
+      amountRef.current?.focus()
+      return
     }
-    amountRef.current?.focus()
-  }, [amount, desc, debtor, due, box.id, uid, load])
+
+    const newTx = sign === 0
+      ? { id: crypto.randomUUID(), box_id: box.id, user_id: uid, amount: v,
+          description: desc.trim() || null, debtor: debtor.trim() || null,
+          due_date: due || null, pending: true, settled: false,
+          created_at: new Date().toISOString() }
+      : { id: crypto.randomUUID(), box_id: box.id, user_id: uid, amount: sign * v,
+          description: desc.trim() || null, pending: false, settled: false,
+          created_at: new Date().toISOString() }
+
+    // optimistic update — instant UI
+    setTxs(prev => [newTx, ...prev])
+    resetForm()
+    if (sign === 0) setDebtOpen(false)
+
+    const { error } = await supabase.from('transactions').insert({
+      box_id: newTx.box_id, user_id: newTx.user_id, amount: newTx.amount,
+      description: newTx.description, debtor: newTx.debtor, due_date: newTx.due_date,
+      pending: newTx.pending, settled: newTx.settled,
+    })
+    if (error) {
+      // rollback
+      setTxs(prev => prev.filter(t => t.id !== newTx.id))
+      setErr('erro ao salvar')
+    }
+  }, [amount, desc, debtor, due, debtOpen, box.id, uid])
 
   const toggleDebt = useCallback(async (t) => {
     const settled = !t.settled
-    await supabase.from('transactions').update({ settled }).eq('id', t.id)
+    // optimistic
     setTxs(prev => prev.map(x => x.id === t.id ? { ...x, settled } : x))
+    const { error } = await supabase.from('transactions').update({ settled }).eq('id', t.id)
+    if (error) setTxs(prev => prev.map(x => x.id === t.id ? { ...x, settled: t.settled } : x))
   }, [])
 
   const delTx = useCallback(async (id) => {
-    await supabase.from('transactions').delete().eq('id', id).eq('user_id', uid)
+    // optimistic
     setTxs(prev => prev.filter(x => x.id !== id))
+    await supabase.from('transactions').delete().eq('id', id).eq('user_id', uid)
   }, [uid])
 
-  const normalTxs   = txs.filter(t => !t.pending)
-  const debtTxs     = txs.filter(t => t.pending)
+  // derive display values
+  const normalTxs    = txs.filter(t => !t.pending)
+  const debtTxs      = txs.filter(t => t.pending)
   const pendingDebts = debtTxs.filter(t => !t.settled)
   const settledDebts = debtTxs.filter(t => t.settled)
 
-  const income        = sum(normalTxs, t => t.amount > 0 ? t.amount : 0)
-  const expense       = sum(normalTxs, t => t.amount < 0 ? t.amount : 0)
-  const pendingTotal  = sum(pendingDebts, t => t.amount)
-  const bal           = income + expense
-  const overdueN      = pendingDebts.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
+  const income       = sum(normalTxs, t => t.amount > 0 ? t.amount : 0)
+  const expense      = sum(normalTxs, t => t.amount < 0 ? t.amount : 0)
+  const received     = sum(settledDebts, t => t.amount)   // settled debts count in balance
+  const pendingTotal = sum(pendingDebts, t => t.amount)
+  const bal          = income + expense + received         // FIX: include received debts
+  const overdueN     = pendingDebts.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
 
   const visibleNormal = expanded ? normalTxs : normalTxs.slice(0, 3)
   const extra         = normalTxs.length - 3
@@ -153,7 +165,6 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
       className={`${s.boxCard}${focused ? ' ' + s.focused : ''}`}
       onClick={onFocus}
     >
-      {/* balance */}
       <div className={s.balCard}>
         <div>
           <div className={s.balLabel}>{box.name.toUpperCase()}</div>
@@ -162,34 +173,45 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
           </div>
         </div>
         <div className={s.balStats}>
-          <div>+ <span className={s.inColor}>{fmt(income)}</span></div>
+          <div>+ <span className={s.inColor}>{fmt(income + received)}</span></div>
           <div>− <span className={s.outColor}>{fmt(Math.abs(expense))}</span></div>
           {pendingTotal > 0 && (
             <div>
-              {overdueN > 0
-                ? <span className={s.outColor}>{overdueN} venc. </span>
-                : null
-              }
+              {overdueN > 0 && <span className={s.outColor}>{overdueN} venc. </span>}
               ○ <span className={s.pendingColor}>{fmt(pendingTotal)}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* form */}
       <div className={s.entryForm}>
         <div className={s.entryRow}>
-          <AmountInput
-            inputRef={amountRef} value={amount} onChange={setAmount}
-            onEnter={() => descRef.current?.focus()} onFocus={onFocus}
+          <input
+            ref={amountRef}
+            className={s.input}
+            style={{ fontSize: '16px', flex: '0 0 110px' }}
+            placeholder="valor"
+            type="text"
+            inputMode="decimal"
+            value={amount}
+            onChange={e => { setErr(''); setAmount(e.target.value.replace(/[^0-9,.]/g, '')) }}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), descRef.current?.focus())}
+            onFocus={onFocus}
           />
           <input
-            ref={descRef} className={s.input} style={{ fontSize: '16px' }}
-            placeholder="descrição" value={desc}
+            ref={descRef}
+            className={s.input}
+            style={{ fontSize: '16px' }}
+            placeholder="descrição"
+            value={desc}
             onChange={e => setDesc(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); addTx(-1) }
-              else if (e.key === 'ArrowUp') { e.preventDefault(); addTx(1) }
+              if (!debtOpen) {
+                if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); addTx(-1) }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); addTx(1) }
+              } else if (e.key === 'Enter') {
+                e.preventDefault(); addTx(0)
+              }
             }}
             onFocus={onFocus}
           />
@@ -201,6 +223,7 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
               className={s.input} style={{ fontSize: '16px' }}
               placeholder="devedor (opcional)" value={debtor}
               onChange={e => setDebtor(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addTx(0)}
               onFocus={onFocus}
             />
             <input
@@ -214,20 +237,16 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
         )}
 
         <div className={s.entryBtns}>
-          <button className={`${s.btn} ${s.green}`}  onClick={() => addTx(1)}>+ entrada</button>
-          <button className={`${s.btn} ${s.danger}`} onClick={() => addTx(-1)}>− saída</button>
+          <button className={`${s.btn} ${s.green}`}  onPointerDown={() => addTx(1)}>+ entrada</button>
+          <button className={`${s.btn} ${s.danger}`} onPointerDown={() => addTx(-1)}>− saída</button>
           <button
             className={`${s.btn} ${s.debtBtn}${debtOpen ? ' ' + s.debtBtnActive : ''}`}
-            onClick={() => {
-              if (debtOpen) addTx(0)
-              else setDebtOpen(true)
-            }}
-          >{debtOpen ? '○ registrar' : '○ dívida'}</button>
+            onPointerDown={() => debtOpen ? addTx(0) : setDebtOpen(true)}
+          >{debtOpen ? '○ ok' : '○ dívida'}</button>
         </div>
         {err && <p className={s.err}>{err}</p>}
       </div>
 
-      {/* list */}
       <div className={s.txList}>
         {loading ? <div className={s.txLoading}>·</div> : (
           txs.length === 0
@@ -239,18 +258,14 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
                     {expanded ? '▲' : `▼ ${extra} mais`}
                   </button>
                 )}
-                {debtTxs.length > 0 && (
-                  <>
-                    {normalTxs.length > 0 && <div className={s.divider}>a receber</div>}
-                    {pendingDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                    {settledDebts.length > 0 && (
-                      <>
-                        <div className={s.divider}>recebidas</div>
-                        {settledDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                      </>
-                    )}
-                  </>
-                )}
+                {debtTxs.length > 0 && <>
+                  {normalTxs.length > 0 && <div className={s.divider}>a receber</div>}
+                  {pendingDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                  {settledDebts.length > 0 && <>
+                    <div className={s.divider}>recebidas</div>
+                    {settledDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                  </>}
+                </>}
               </>
         )}
       </div>
@@ -327,9 +342,9 @@ export default function Dashboard({ user }) {
   }, [newBoxName, boxes, uid])
 
   const deleteBox = useCallback(async (box) => {
-    await supabase.from('boxes').delete().eq('id', box.id)
     setBoxes(prev => prev.filter(b => b.id !== box.id))
     setConfirmDelete(null)
+    await supabase.from('boxes').delete().eq('id', box.id)
   }, [])
 
   if (loading) return <div className={s.page}><div className={s.dot}>·</div></div>
