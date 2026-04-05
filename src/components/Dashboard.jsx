@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { supabase } from '../lib/supabase'
 import s from './Dashboard.module.css'
 
-// ── utils ────────────────────────────────────────────────────────────────────
 const fmt = n =>
   'R$\u00a0' + Math.abs(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -18,10 +17,9 @@ const timeAgo = ts => {
 }
 
 const parseAmt = str => parseFloat(String(str).replace(',', '.'))
-
 const sum = (arr, fn) => arr.reduce((a, x) => a + fn(x), 0)
 
-// ── TxRow ────────────────────────────────────────────────────────────────────
+// ── TxRow ─────────────────────────────────────────────────────────────────────
 const TxRow = memo(({ t, onToggle, onDel }) => {
   const overdue = t.pending && !t.settled && t.due_date && new Date(t.due_date + 'T12:00') < new Date()
   const cls = t.pending
@@ -57,11 +55,11 @@ const TxRow = memo(({ t, onToggle, onDel }) => {
 })
 
 // ── AmountInput ───────────────────────────────────────────────────────────────
-const AmountInput = ({ value, onChange, onEnter, inputRef, onFocus, style }) => (
+const AmountInput = ({ value, onChange, onEnter, inputRef, onFocus }) => (
   <input
     ref={inputRef}
     className={s.input}
-    style={{ fontSize: '16px', ...style }}
+    style={{ fontSize: '16px', flex: '0 0 110px' }}
     placeholder="valor"
     type="text"
     inputMode="decimal"
@@ -74,11 +72,10 @@ const AmountInput = ({ value, onChange, onEnter, inputRef, onFocus, style }) => 
 
 // ── BoxCard ───────────────────────────────────────────────────────────────────
 function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
-  const isDebt = box.type === 'debt'
-
   const [txs, setTxs]           = useState([])
   const [loading, setLoading]   = useState(true)
   const [expanded, setExpanded] = useState(false)
+  const [debtOpen, setDebtOpen] = useState(false)  // extra debt fields visible
   const [amount, setAmount]     = useState('')
   const [desc,   setDesc]       = useState('')
   const [debtor, setDebtor]     = useState('')
@@ -87,20 +84,18 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const amountRef = useRef(null)
   const descRef   = useRef(null)
 
-  // load — stable ref avoids stale closure loops
-  const boxId = box.id
   const load = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('transactions')
       .select('id,amount,description,pending,settled,debtor,due_date,created_at')
-      .eq('box_id', boxId)
-      .order('settled', { ascending: true })
+      .eq('box_id', box.id)
+      .order('pending', { ascending: true })
       .order('created_at', { ascending: false })
       .limit(150)
     setTxs(data ?? [])
     setLoading(false)
-  }, [boxId])
+  }, [box.id])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (focused) amountRef.current?.focus() }, [focused])
@@ -109,23 +104,28 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
     setErr('')
     const v = parseAmt(amount)
     if (!amount || isNaN(v) || v <= 0) { setErr('valor inválido'); return }
-    const row = isDebt
-      ? { box_id: boxId, user_id: uid, amount: v, description: desc.trim() || null,
-          debtor: debtor.trim() || null, due_date: due || null, pending: true, settled: false }
-      : { box_id: boxId, user_id: uid, amount: sign * v, description: desc.trim() || null,
+    const row = sign === 0
+      ? { box_id: box.id, user_id: uid, amount: v,
+          description: desc.trim() || null,
+          debtor: debtor.trim() || null,
+          due_date: due || null,
+          pending: true, settled: false }
+      : { box_id: box.id, user_id: uid, amount: sign * v,
+          description: desc.trim() || null,
           pending: false, settled: false }
     const { error } = await supabase.from('transactions').insert(row)
-    if (!error) { setAmount(''); setDesc(''); setDebtor(''); setDue(''); load() }
+    if (!error) {
+      setAmount(''); setDesc(''); setDebtor(''); setDue('')
+      if (sign !== 0) setDebtOpen(false)
+      load()
+    }
     amountRef.current?.focus()
-  }, [amount, desc, debtor, due, isDebt, boxId, uid, load])
+  }, [amount, desc, debtor, due, box.id, uid, load])
 
   const toggleDebt = useCallback(async (t) => {
-    const nowSettled = !t.settled
-    // settled=true → counts in balance (pending stays true to mark it as a debt row)
-    await supabase.from('transactions')
-      .update({ settled: nowSettled })
-      .eq('id', t.id)
-    setTxs(prev => prev.map(x => x.id === t.id ? { ...x, settled: nowSettled } : x))
+    const settled = !t.settled
+    await supabase.from('transactions').update({ settled }).eq('id', t.id)
+    setTxs(prev => prev.map(x => x.id === t.id ? { ...x, settled } : x))
   }, [])
 
   const delTx = useCallback(async (id) => {
@@ -133,56 +133,46 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
     setTxs(prev => prev.filter(x => x.id !== id))
   }, [uid])
 
-  // split & compute
-  const normalTxs  = txs.filter(t => !t.pending)
-  const debtTxs    = txs.filter(t => t.pending)
-  const pendingArr  = debtTxs.filter(t => !t.settled)
-  const settledArr  = debtTxs.filter(t => t.settled)
+  const normalTxs   = txs.filter(t => !t.pending)
+  const debtTxs     = txs.filter(t => t.pending)
+  const pendingDebts = debtTxs.filter(t => !t.settled)
+  const settledDebts = debtTxs.filter(t => t.settled)
 
-  const income   = sum(normalTxs, t => t.amount > 0 ? t.amount : 0)
-  const expense  = sum(normalTxs, t => t.amount < 0 ? t.amount : 0)
-  const received = sum(settledArr, t => t.amount)
-  const pendingTotal = sum(pendingArr, t => t.amount)
-  const bal      = income + expense  // normal boxes: debt settlements don't affect balance directly
+  const income        = sum(normalTxs, t => t.amount > 0 ? t.amount : 0)
+  const expense       = sum(normalTxs, t => t.amount < 0 ? t.amount : 0)
+  const pendingTotal  = sum(pendingDebts, t => t.amount)
+  const bal           = income + expense
+  const overdueN      = pendingDebts.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
 
-  const overdueN  = pendingArr.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
   const visibleNormal = expanded ? normalTxs : normalTxs.slice(0, 3)
   const extra         = normalTxs.length - 3
 
   return (
     <div
       ref={cardRef}
-      className={`${s.boxCard}${isDebt ? ' ' + s.debtBox : ''}${focused ? ' ' + s.focused : ''}`}
+      className={`${s.boxCard}${focused ? ' ' + s.focused : ''}`}
       onClick={onFocus}
     >
-      {/* header */}
+      {/* balance */}
       <div className={s.balCard}>
         <div>
-          <div className={s.balLabel}>
-            {box.name.toUpperCase()}
-            {isDebt && <span className={s.typeTag}>dívidas</span>}
+          <div className={s.balLabel}>{box.name.toUpperCase()}</div>
+          <div className={`${s.balAmount} ${bal > 0 ? s.pos : bal < 0 ? s.neg : s.zero}`}>
+            {bal < 0 ? '−' : ''}{fmt(bal)}
           </div>
-          <div className={`${s.balAmount} ${
-            isDebt
-              ? pendingTotal > 0 ? s.pendingColor : s.zero
-              : bal > 0 ? s.pos : bal < 0 ? s.neg : s.zero
-          }`}>
-            {isDebt
-              ? fmt(pendingTotal)
-              : (bal < 0 ? '−' : '') + fmt(bal)
-            }
-          </div>
-          {isDebt && <div className={s.balSub}>a receber</div>}
         </div>
         <div className={s.balStats}>
-          {isDebt ? <>
-            {overdueN > 0 && <div className={s.overdueTag}>{overdueN} vencida{overdueN > 1 ? 's' : ''}</div>}
-            <div>recebido <span className={s.inColor}>{fmt(received)}</span></div>
-            <div>{pendingArr.length} pendente{pendingArr.length !== 1 ? 's' : ''}</div>
-          </> : <>
-            <div>+ <span className={s.inColor}>{fmt(income)}</span></div>
-            <div>− <span className={s.outColor}>{fmt(Math.abs(expense))}</span></div>
-          </>}
+          <div>+ <span className={s.inColor}>{fmt(income)}</span></div>
+          <div>− <span className={s.outColor}>{fmt(Math.abs(expense))}</span></div>
+          {pendingTotal > 0 && (
+            <div>
+              {overdueN > 0
+                ? <span className={s.outColor}>{overdueN} venc. </span>
+                : null
+              }
+              ○ <span className={s.pendingColor}>{fmt(pendingTotal)}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -192,68 +182,55 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
           <AmountInput
             inputRef={amountRef} value={amount} onChange={setAmount}
             onEnter={() => descRef.current?.focus()} onFocus={onFocus}
-            style={{ flex: '0 0 110px' }}
           />
           <input
             ref={descRef} className={s.input} style={{ fontSize: '16px' }}
             placeholder="descrição" value={desc}
             onChange={e => setDesc(e.target.value)}
             onKeyDown={e => {
-              if (isDebt) {
-                if (e.key === 'Enter') { e.preventDefault(); document.getElementById(`dbt-${boxId}`)?.focus() }
-              } else {
-                if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); addTx(-1) }
-                else if (e.key === 'ArrowUp') { e.preventDefault(); addTx(1) }
-              }
+              if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); addTx(-1) }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); addTx(1) }
             }}
             onFocus={onFocus}
           />
         </div>
 
-        {isDebt && (
+        {debtOpen && (
           <div className={s.entryRow}>
             <input
-              id={`dbt-${boxId}`} className={s.input} style={{ fontSize: '16px' }}
-              placeholder="devedor" value={debtor}
+              className={s.input} style={{ fontSize: '16px' }}
+              placeholder="devedor (opcional)" value={debtor}
               onChange={e => setDebtor(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && document.getElementById(`due-${boxId}`)?.focus()}
               onFocus={onFocus}
             />
             <input
-              id={`due-${boxId}`} className={s.input}
-              style={{ fontSize: '16px', flex: '0 0 130px' }}
+              className={s.input} style={{ fontSize: '16px', flex: '0 0 130px' }}
               type="date" value={due}
               onChange={e => setDue(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addTx(1)}
+              onKeyDown={e => e.key === 'Enter' && addTx(0)}
               onFocus={onFocus}
             />
           </div>
         )}
 
-        {isDebt
-          ? <button className={`${s.btn} ${s.primary} ${s.full}`} onClick={() => addTx(1)}>+ registrar</button>
-          : <div className={s.entryBtns}>
-              <button className={`${s.btn} ${s.green}`} onClick={() => addTx(1)}>+ entrada</button>
-              <button className={`${s.btn} ${s.danger}`} onClick={() => addTx(-1)}>− saída</button>
-            </div>
-        }
+        <div className={s.entryBtns}>
+          <button className={`${s.btn} ${s.green}`}  onClick={() => addTx(1)}>+ entrada</button>
+          <button className={`${s.btn} ${s.danger}`} onClick={() => addTx(-1)}>− saída</button>
+          <button
+            className={`${s.btn} ${s.debtBtn}${debtOpen ? ' ' + s.debtBtnActive : ''}`}
+            onClick={() => {
+              if (debtOpen) addTx(0)
+              else setDebtOpen(true)
+            }}
+          >{debtOpen ? '○ registrar' : '○ dívida'}</button>
+        </div>
         {err && <p className={s.err}>{err}</p>}
       </div>
 
       {/* list */}
       <div className={s.txList}>
-        {loading ? <div className={s.txLoading}>·</div> : isDebt ? (
-          debtTxs.length === 0
-            ? <div className={s.empty}>sem dívidas</div>
-            : <>
-                {pendingArr.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                {settledArr.length > 0 && <>
-                  {pendingArr.length > 0 && <div className={s.divider}>recebidas</div>}
-                  {settledArr.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                </>}
-              </>
-        ) : (
-          normalTxs.length === 0
+        {loading ? <div className={s.txLoading}>·</div> : (
+          txs.length === 0
             ? <div className={s.empty}>sem lançamentos</div>
             : <>
                 {visibleNormal.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
@@ -261,6 +238,18 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
                   <button className={s.expandBtn} onClick={() => setExpanded(x => !x)}>
                     {expanded ? '▲' : `▼ ${extra} mais`}
                   </button>
+                )}
+                {debtTxs.length > 0 && (
+                  <>
+                    {normalTxs.length > 0 && <div className={s.divider}>a receber</div>}
+                    {pendingDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                    {settledDebts.length > 0 && (
+                      <>
+                        <div className={s.divider}>recebidas</div>
+                        {settledDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                      </>
+                    )}
+                  </>
                 )}
               </>
         )}
@@ -281,9 +270,8 @@ export default function Dashboard({ user }) {
   const [boxes, setBoxes]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
-  const [modal, setModal]           = useState(null)
   const [newBoxName, setNewBoxName] = useState('')
-  const [newBoxType, setNewBoxType] = useState('normal')
+  const [modalOpen, setModalOpen]   = useState(false)
   const [modalErr, setModalErr]     = useState('')
   const [focusedIdx, setFocusedIdx] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState(null)
@@ -293,7 +281,7 @@ export default function Dashboard({ user }) {
   const username = user.user_metadata?.username || user.email?.split('@')[0] || '—'
 
   useEffect(() => {
-    supabase.from('boxes').select('id,name,type,created_at').eq('user_id', uid).order('created_at')
+    supabase.from('boxes').select('id,name,created_at').eq('user_id', uid).order('created_at')
       .then(({ data }) => { setBoxes(data ?? []); setLoading(false) })
   }, [uid])
 
@@ -313,18 +301,18 @@ export default function Dashboard({ user }) {
     const handle = e => {
       const inInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)
       if (e.key === 'Escape') {
-        if (modal) { setModal(null); return }
+        if (modalOpen) { setModalOpen(false); return }
         if (confirmDelete) { setConfirmDelete(null); return }
         searchRef.current?.blur(); return
       }
       if (e.key === '/' && !inInput) { e.preventDefault(); searchRef.current?.focus(); return }
-      if (modal || confirmDelete || inInput) return
+      if (modalOpen || confirmDelete || inInput) return
       if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); navigate(1) }
       if (e.key === 'ArrowUp'   || e.key === 'k') { e.preventDefault(); navigate(-1) }
     }
     window.addEventListener('keydown', handle)
     return () => window.removeEventListener('keydown', handle)
-  }, [modal, confirmDelete, navigate])
+  }, [modalOpen, confirmDelete, navigate])
 
   const createBox = useCallback(async () => {
     setModalErr('')
@@ -332,14 +320,13 @@ export default function Dashboard({ user }) {
     if (!name) { setModalErr('nome obrigatório'); return }
     if (boxes.find(b => b.name.toLowerCase() === name.toLowerCase())) { setModalErr('já existe'); return }
     const { data, error } = await supabase.from('boxes')
-      .insert({ name, user_id: uid, type: newBoxType }).select('id,name,type,created_at').single()
+      .insert({ name, user_id: uid }).select('id,name,created_at').single()
     if (error) { setModalErr(error.message); return }
     setBoxes(prev => [...prev, data])
-    setModal(null); setNewBoxName(''); setNewBoxType('normal')
-  }, [newBoxName, newBoxType, boxes, uid])
+    setModalOpen(false); setNewBoxName('')
+  }, [newBoxName, boxes, uid])
 
   const deleteBox = useCallback(async (box) => {
-    // transactions cascade via FK, just delete the box
     await supabase.from('boxes').delete().eq('id', box.id)
     setBoxes(prev => prev.filter(b => b.id !== box.id))
     setConfirmDelete(null)
@@ -363,7 +350,7 @@ export default function Dashboard({ user }) {
           />
           <div className={s.headerRight}>
             <button className={`${s.btn} ${s.small} ${s.addBoxBtn}`}
-              onClick={() => { setModal('newbox'); setNewBoxName(''); setNewBoxType('normal'); setModalErr('') }}>
+              onClick={() => { setModalOpen(true); setNewBoxName(''); setModalErr('') }}>
               + caixa
             </button>
             <button className={s.logoutBtn} onClick={() => supabase.auth.signOut()}>
@@ -390,36 +377,26 @@ export default function Dashboard({ user }) {
         )}
       </div>
 
-      {/* modal: nova caixa */}
-      {modal === 'newbox' && (
-        <div className={s.modalBg} onClick={e => e.target === e.currentTarget && setModal(null)}>
+      {modalOpen && (
+        <div className={s.modalBg} onClick={e => e.target === e.currentTarget && setModalOpen(false)}>
           <div className={s.modal}>
             <h3 className={s.modalTitle}>nova caixa</h3>
             <input
               className={s.input} style={{ fontSize: '16px' }}
               placeholder="nome" maxLength={24}
               value={newBoxName} onChange={e => setNewBoxName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') createBox(); if (e.key === 'Escape') setModal(null) }}
+              onKeyDown={e => { if (e.key === 'Enter') createBox(); if (e.key === 'Escape') setModalOpen(false) }}
               autoFocus
             />
-            <div className={s.typeToggle}>
-              <button
-                className={`${s.typeBtn}${newBoxType === 'normal' ? ' ' + s.typeBtnActive : ''}`}
-                onClick={() => setNewBoxType('normal')}>normal</button>
-              <button
-                className={`${s.typeBtn}${newBoxType === 'debt' ? ' ' + s.typeBtnDebt : ''}`}
-                onClick={() => setNewBoxType('debt')}>dívidas</button>
-            </div>
             {modalErr && <p className={s.err}>{modalErr}</p>}
             <div className={s.modalBtns}>
-              <button className={s.btn} onClick={() => setModal(null)}>cancelar</button>
+              <button className={s.btn} onClick={() => setModalOpen(false)}>cancelar</button>
               <button className={`${s.btn} ${s.primary}`} onClick={createBox}>criar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* modal: confirmar exclusão */}
       {confirmDelete && (
         <div className={s.modalBg} onClick={e => e.target === e.currentTarget && setConfirmDelete(null)}>
           <div className={s.modal}>
