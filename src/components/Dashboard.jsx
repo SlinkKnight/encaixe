@@ -54,11 +54,12 @@ const TxRow = memo(({ t, onToggle, onDel }) => {
   )
 })
 
-// ── BoxCard ───────────────────────────────────────────────────────────────────
+// ── BoxCard ────��──────────────────────────────────────────────────────────────
 function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const [txs, setTxs]           = useState([])
   const [loading, setLoading]   = useState(true)
   const [expanded, setExpanded] = useState(false)
+  const [debtExpanded, setDebtExpanded] = useState(false)
   const [debtOpen, setDebtOpen] = useState(false)
   const [amount, setAmount]     = useState('')
   const [desc,   setDesc]       = useState('')
@@ -157,7 +158,13 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const overdueN     = pendingDebts.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
 
   const visibleNormal = expanded ? normalTxs : normalTxs.slice(0, 3)
-  const extra         = normalTxs.length - 3
+  const extraNormal   = normalTxs.length - 3
+
+  const visiblePending = debtExpanded ? pendingDebts : pendingDebts.slice(0, 3)
+  const extraPending   = pendingDebts.length - 3
+
+  const visibleSettled = settledDebts
+  const extraSettled   = settledDebts.length - 3
 
   return (
     <div
@@ -253,17 +260,27 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
             ? <div className={s.empty}>sem lançamentos</div>
             : <>
                 {visibleNormal.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                {extra > 0 && (
+                {extraNormal > 0 && (
                   <button className={s.expandBtn} onClick={() => setExpanded(x => !x)}>
-                    {expanded ? '▲' : `▼ ${extra} mais`}
+                    {expanded ? '▲' : `▼ ${extraNormal} mais`}
                   </button>
                 )}
                 {debtTxs.length > 0 && <>
                   {normalTxs.length > 0 && <div className={s.divider}>a receber</div>}
-                  {pendingDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                  {visiblePending.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                  {extraPending > 0 && (
+                    <button className={s.expandBtn} onClick={() => setDebtExpanded(x => !x)}>
+                      {debtExpanded ? '▲' : `▼ ${extraPending} mais`}
+                    </button>
+                  )}
                   {settledDebts.length > 0 && <>
                     <div className={s.divider}>recebidas</div>
-                    {settledDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                    {visibleSettled.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                    {extraSettled > 0 && (
+                      <button className={s.expandBtn} onClick={() => setDebtExpanded(x => !x)}>
+                        {debtExpanded ? '▲' : `▼ ${extraSettled} mais`}
+                      </button>
+                    )}
                   </>}
                 </>}
               </>
