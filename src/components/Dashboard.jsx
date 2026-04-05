@@ -19,7 +19,7 @@ const timeAgo = ts => {
 const parseAmt = str => parseFloat(String(str).replace(',', '.'))
 const sum = (arr, fn) => arr.reduce((a, x) => a + fn(x), 0)
 
-// ── TxRow ─────────────────────────────────────────────────────────────────────
+// ── TxRow ────────────────────────────���────────────────────────────────────────
 const TxRow = memo(({ t, onToggle, onDel }) => {
   const overdue = t.pending && !t.settled && t.due_date && new Date(t.due_date + 'T12:00') < new Date()
   const cls = t.pending
@@ -54,7 +54,7 @@ const TxRow = memo(({ t, onToggle, onDel }) => {
   )
 })
 
-// ── BoxCard ────��──────────────────────────────────────────────────────────────
+// ── BoxCard ───────────────────────────────────────────────────────────────────
 function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const [txs, setTxs]           = useState([])
   const [loading, setLoading]   = useState(true)
@@ -92,7 +92,6 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
 
   const addTx = useCallback(async (sign) => {
     // sign=1 entrada, sign=-1 saída, sign=0 dívida
-    // if entrada/saída clicked while debtOpen → just close debt panel, reset, don't error
     if (sign !== 0 && debtOpen) {
       setDebtOpen(false); resetForm(); return
     }
@@ -149,6 +148,9 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const debtTxs      = txs.filter(t => t.pending)
   const pendingDebts = debtTxs.filter(t => !t.settled)
   const settledDebts = debtTxs.filter(t => t.settled)
+  
+  // Merge pending and settled, pendentes first, after settled
+  const allDebts = [...pendingDebts, ...settledDebts]
 
   const income       = sum(normalTxs, t => t.amount > 0 ? t.amount : 0)
   const expense      = sum(normalTxs, t => t.amount < 0 ? t.amount : 0)
@@ -158,13 +160,10 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
   const overdueN     = pendingDebts.filter(t => t.due_date && new Date(t.due_date + 'T12:00') < new Date()).length
 
   const visibleNormal = expanded ? normalTxs : normalTxs.slice(0, 3)
-  const extraNormal   = normalTxs.length - 3
+  const extraNormal   = Math.max(0, normalTxs.length - 3)
 
-  const visiblePending = debtExpanded ? pendingDebts : pendingDebts.slice(0, 3)
-  const extraPending   = pendingDebts.length - 3
-
-  const visibleSettled = settledDebts
-  const extraSettled   = settledDebts.length - 3
+  const visibleDebts = debtExpanded ? allDebts : allDebts.slice(0, 3)
+  const extraDebts   = Math.max(0, allDebts.length - 3)
 
   return (
     <div
@@ -265,23 +264,14 @@ function BoxCard({ box, uid, onDelete, focused, onFocus, cardRef }) {
                     {expanded ? '▲' : `▼ ${extraNormal} mais`}
                   </button>
                 )}
-                {debtTxs.length > 0 && <>
-                  {normalTxs.length > 0 && <div className={s.divider}>a receber</div>}
-                  {visiblePending.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                  {extraPending > 0 && (
+                {allDebts.length > 0 && <>
+                  {normalTxs.length > 0 && <div className={s.divider}>dívidas</div>}
+                  {visibleDebts.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
+                  {extraDebts > 0 && (
                     <button className={s.expandBtn} onClick={() => setDebtExpanded(x => !x)}>
-                      {debtExpanded ? '▲' : `▼ ${extraPending} mais`}
+                      {debtExpanded ? '▲' : `▼ ${extraDebts} mais`}
                     </button>
                   )}
-                  {settledDebts.length > 0 && <>
-                    <div className={s.divider}>recebidas</div>
-                    {visibleSettled.map(t => <TxRow key={t.id} t={t} onToggle={toggleDebt} onDel={delTx} />)}
-                    {extraSettled > 0 && (
-                      <button className={s.expandBtn} onClick={() => setDebtExpanded(x => !x)}>
-                        {debtExpanded ? '▲' : `▼ ${extraSettled} mais`}
-                      </button>
-                    )}
-                  </>}
                 </>}
               </>
         )}
